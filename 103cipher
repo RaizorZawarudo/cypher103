@@ -1,0 +1,243 @@
+#!/usr/bin/python3
+
+import sys
+import math
+
+def check_inputs():
+    if len(sys.argv) == 2 and sys.argv[1] == "-h":
+        print_usage()
+        exit(0)
+    if len(sys.argv) != 4:
+        print("Invalid number of arguments", file = sys.stderr)
+        exit(84)
+    try:
+        test = int(sys.argv[3])
+        if test != 0 and test != 1:
+            print("Invalid flag.")
+            sys.exit(84)
+    except ValueError:
+        print("Invalid flag.")
+        sys.exit(84)
+    if not sys.argv[2].isascii():
+        print("Key contains non ascii values")
+        sys.exit(84)
+    if sys.argv[3] == "0" and not sys.argv[1].isascii():
+        print("Message contains non ascii values")
+        sys.exit(84)
+
+def print_usage():
+    print("USAGE")
+    print("\t./103cypher message key flag")
+    print("DESCRIPTION")
+    print("\tmessage\ta message, made of ASCII characters\n")
+    print("\tkey\tthe encryption key, made of ASCII characters\n")
+    print("\tflag\t0 for the message to be encrypted, 1 to be decrypted")
+
+def display_result(key_matrix, encrypted_message, flag):
+    if flag == 0:
+        print("Key matrix:")
+        for i in range(len(key_matrix)):
+            for j in range(len(key_matrix[0])):
+                if j == len(key_matrix[0]) - 1:
+                    print(key_matrix[i][j])
+                else:
+                    print(key_matrix[i][j], end='\t')
+        print("\nEncrypted message:")
+        for line in encrypted_message:
+            for value in line:
+                if value == encrypted_message[-1][-1]:
+                    print(value, end='')
+                else:
+                    print(value, "", end='')
+
+    if flag == 1:
+        print("Key matrix:")
+        for i in range(len(key_matrix)):
+            for j in range(len(key_matrix[0])):
+                if j == len(key_matrix[0]) - 1:
+                    print(format(key_matrix[i][j], ".3f"))
+                else:
+                    print(format(key_matrix[i][j], ".3f"), end='\t')
+        print("\nDecrypted message:")
+        for line in encrypted_message:
+            for value in line:
+                if value == encrypted_message[-1][-1]:
+                    print(chr(value), end='')
+                else:
+                    print(chr(value), end='')
+
+def get_key_matrix(key):
+    matrix_size = math.ceil(math.sqrt(len(key)))
+    matrix = [[0 for i in range(matrix_size)] for j in range(matrix_size)]
+    k = 0
+    x = 0
+    y = 0
+    for line in matrix:
+        y = 0
+        for value in line:
+            if k < len(key):
+                matrix[x][y] = ord(key[k]);
+            k += 1
+            y += 1
+        x += 1
+    return matrix
+
+def check_printable(message, i):
+    if ord(message[i]) < 177:
+        return i
+    else:
+        return check_printable(message, i + 1)
+
+def get_message_matrix(message, matrix_size):
+    matrix_height = math.ceil(len(message) / matrix_size) + 1
+    message_matrix = [[0 for i in range(matrix_size)] for j in range(matrix_height - 1)]
+    i = 0
+    x = 0
+    y = 0
+    for line in message_matrix:
+        y = 0
+        for value in line :
+            if i < len(message):
+                i = check_printable(message, i)
+                message_matrix[x][y] = ord(message[i])
+            i += 1
+            y += 1
+        x += 1
+    return message_matrix
+
+def do_multiplication(matrix1, matrix2, current_line, column):
+    matrix1_row = matrix1[current_line]
+    matrix2_col = [0 for i in range(len(matrix1[0]))]
+    result = 0
+    pos = 0
+    this_line = 0
+    for line in matrix2:
+        matrix2_col[pos] = matrix2[this_line][column]
+        pos += 1
+        this_line += 1
+    for x in range(len(matrix1[0])):
+        result += float(matrix1_row[x]) * matrix2_col[x]    
+    return round(result)
+
+def multiply_matrix(matrix1, matrix2):
+    matrix1_height = len(matrix1)
+    matrix1_width = len(matrix1[0])
+    output = [[0 for i in range(matrix1_width)] for j in range(matrix1_height)]
+    column = 0
+    current_line = 0
+
+    for line in output:
+        column = 0
+        for value in line:
+            output[current_line][column] = do_multiplication(matrix1, matrix2, current_line, column)
+            column += 1
+        current_line += 1 
+    return output
+
+def get_minor(x_excluded, y_excluded, matrix):
+    minor_matrix = []
+
+    for y in range(3):
+        for x in range(3):
+            if (y != y_excluded and x != x_excluded):
+                minor_matrix.append(matrix[y][x])
+    output = minor_matrix[0] * minor_matrix[3] - minor_matrix[1] * minor_matrix[2]
+    return output
+
+def matrix_of_minors(matrix):
+    output = [[0 for i in range(3)] for j in range(3)]
+
+    for y in range(3):
+        for x in range(3):
+            output[y][x] = get_minor(x, y, matrix)
+    return output
+
+def get_comatrix(matrix):
+    template = [[1, -1, 1], [-1, 1, -1], [1, -1, 1]]
+
+    for y in range(3):
+        for x in range(3):
+            matrix[y][x] = template[y][x] * matrix[y][x]
+    return matrix
+
+def get_determinant(matrix):
+    pos_diagonals = matrix[0][0] * matrix[1][1] * matrix[2][2] + matrix[0][1] * matrix[1][2] * matrix[2][0] + matrix[0][2] * matrix[1][0] * matrix[2][1]
+    neg_diagonals = matrix[2][0] * matrix[1][1] * matrix[0][2] + matrix[2][1] * matrix[1][2] * matrix[0][0] + matrix[2][2] * matrix[1][0] * matrix[0][1]
+    determinant = pos_diagonals - neg_diagonals
+
+    return determinant
+
+def transpose_matrix(matrix):
+    transposed_matrix = list(zip(*matrix))
+
+    return transposed_matrix
+
+def inverse_matrix(matrix):
+    if len(matrix) != len(matrix[0]):
+        print("Cannot inverse non square matrix")
+        exit(84)
+    minors_matrix = matrix_of_minors(matrix)
+    comatrix = get_comatrix(minors_matrix)
+    transposed_comatrix = transpose_matrix(comatrix)
+    determinant = get_determinant(matrix)
+    output = [[float(value) * (1 / determinant) for value in line] for line in transposed_comatrix]
+    return output
+
+def get_encrypted_message_matrix(message, matrix_size):
+    cpy = message.split()
+    matrix_height = math.ceil(len(cpy) / matrix_size)
+    message_matrix = [[0 for i in range(matrix_size)] for j in range(matrix_height)]
+    i = 0
+    x = 0
+    y = 0
+    for line in message_matrix:
+        y = 0
+        for value in line :
+            if i < len(cpy):
+                message_matrix[x][y] = cpy[i]
+            i += 1
+            y += 1
+        x += 1
+    return message_matrix
+
+def get_decrypted_message(ascii_matrix):
+    i = 0
+    x = 0
+    y = 0
+    decrypted_message = ""
+    
+    for line in ascii_matrix:
+        y = 0
+        for value in line:
+            print(chr(ascii_matrix[x][y]), end='')
+            i += 1
+            y += 1
+        x += 1
+    
+    return (decrypted_message)
+
+def main():
+
+    check_inputs()    
+    message = sys.argv[1]
+    key = sys.argv[2]
+    flag = int(sys.argv[3])
+    if flag == 0:
+        key_matrix = get_key_matrix(key)
+        message_matrix = get_message_matrix(message, len(key_matrix[0]))
+        encrypted_message = multiply_matrix(message_matrix, key_matrix)
+        display_result(key_matrix, encrypted_message, flag)
+
+    if flag == 1:
+        key_matrix = get_key_matrix(key)
+        reverse_key = inverse_matrix(key_matrix)
+        encrypted_message_matrix = get_encrypted_message_matrix(message, len(reverse_key[0]))
+        try:
+            ascii_matrix = multiply_matrix(encrypted_message_matrix, reverse_key)
+        except:
+            sys.exit(84)
+        display_result(reverse_key, ascii_matrix, flag)
+    print("")
+   
+if __name__ == "__main__":
+    main()
